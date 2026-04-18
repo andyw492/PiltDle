@@ -2,14 +2,16 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
+using System.Collections;
 
 public class UIController : MonoBehaviour
 {
     public GameController gameController;
     public GameObject textPrefab;
     private TextMeshPro score;
+    private int maxEntries = 10;
+    private int currentEntryIndex;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         Button btn = GameObject.Find("button1").GetComponent<Button>();
@@ -25,26 +27,35 @@ public class UIController : MonoBehaviour
         Color color;
         ColorUtility.TryParseHtmlString("#525252", out color);
         score.color = color;
+
+        StartCoroutine(LateStart());
     }
 
-    // Update is called once per frame
-    void Update()
+    IEnumerator LateStart()
     {
-        
+        yield return null;
+        gameController.NewGame();
+        currentEntryIndex = 0;
     }
 
     void BtnClicked()
     {
-        gameController.NewMessage();
-        score.text = (int.Parse(score.text) + 100).ToString();
+        Debug.Log("clicked");
+        int points = gameController.NewGuess();
+        score.text = (int.Parse(score.text) + points).ToString();
 
         EventSystem.current.SetSelectedGameObject(null);
     }
 
     void RestartClicked()
     {
-        gameController.Restart();
+        gameController.NewGame();
         score.text = "0";
         EventSystem.current.SetSelectedGameObject(null);
+    }
+
+    public void GameFinished()
+    {
+        Debug.Log("game finished");
     }
 }
