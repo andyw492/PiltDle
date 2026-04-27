@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ea3df68ac17352e42abf65a106573847
+guid: eaaaa4c8513f0ab43a41533906301fc4
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 979966466883747747
-    second: akuma_pfp 1_0
+      213: 5400786216401691237
+    second: piltover icon_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -51,7 +51,7 @@ TextureImporter:
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 2100
+  spritePixelsToUnits: 100
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: akuma_pfp 1_0
+      name: piltover icon_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1080
-        height: 1080
+        width: 500
+        height: 500
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3af766e3f4a899d00800000000000000
-      internalID: 979966466883747747
+      spriteID: 562e270037273fa40800000000000000
+      internalID: 5400786216401691237
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      akuma_pfp 1_0: 979966466883747747
+      piltover icon_0: 5400786216401691237
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

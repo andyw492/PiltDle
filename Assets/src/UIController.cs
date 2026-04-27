@@ -3,22 +3,45 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using System.Collections;
+using System.Linq;
+using UnityEngine.Rendering;
+using System.Collections.Generic;
 
 public class UIController : MonoBehaviour
 {
     public GameController gameController;
     public GameObject textPrefab;
     private TextMeshPro score;
-    private int maxEntries = 10;
-    private int currentEntryIndex;
+    private Button[] buttons;
 
     void Start()
     {
-        Button btn = GameObject.Find("button1").GetComponent<Button>();
-        btn.onClick.AddListener(BtnClicked);
+        buttons = FindObjectsOfType<Button>();
 
-        Button button_restart = GameObject.Find("button_restart").GetComponent<Button>();
-        button_restart.onClick.AddListener(RestartClicked);
+        foreach (Button button in buttons)
+        {
+            if (button.name.Contains("guess"))
+            {
+                string displayName = button.GetComponentInChildren<TMP_Text>().text;
+                if (displayName != "Random")
+                {
+                    displayName = displayName.Substring(1); // remove the @
+                }
+                button.onClick.AddListener(() => GuessClicked(displayName));
+            }
+        }
+
+        Button reveal_timestamp_button = GameObject.Find("reveal_timestamp_button").GetComponent<Button>();
+        reveal_timestamp_button.onClick.AddListener(RevealTimestampClicked);
+
+        Button reveal_channel_button = GameObject.Find("reveal_channel_button").GetComponent<Button>();
+        reveal_channel_button.onClick.AddListener(RevealChannelClicked);
+
+        Button narrow_options_button = GameObject.Find("narrow_options_button").GetComponent<Button>();
+        narrow_options_button.onClick.AddListener(NarrowOptionsClicked);
+
+        Button restart_button = GameObject.Find("restart_button").GetComponent<Button>();
+        restart_button.onClick.AddListener(RestartClicked);
 
         score = Instantiate(textPrefab).GetComponent<TextMeshPro>();
         score.transform.position = new Vector3(-5.9f, 4.8f, 0);
@@ -28,27 +51,81 @@ public class UIController : MonoBehaviour
         ColorUtility.TryParseHtmlString("#525252", out color);
         score.color = color;
 
-        StartCoroutine(LateStart());
-    }
-
-    IEnumerator LateStart()
-    {
-        yield return null;
         gameController.NewGame();
-        currentEntryIndex = 0;
     }
 
-    void BtnClicked()
+    void GuessClicked(string displayName)
     {
-        Debug.Log("clicked");
-        int points = gameController.NewGuess();
+        foreach (Button button in buttons)
+        {
+            button.interactable = true;
+            button.GetComponentInChildren<TMP_Text>().fontSize = 18;
+        }
+
+        int points = gameController.NewGuess(displayName);
         score.text = (int.Parse(score.text) + points).ToString();
 
         EventSystem.current.SetSelectedGameObject(null);
     }
 
+    void RevealTimestampClicked()
+    {
+        int cost = gameController.RevealTimestamp();
+        score.text = (int.Parse(score.text) - cost).ToString();
+
+        foreach (Button button in buttons)
+        {
+            if (button.name.Contains("timestamp"))
+            {
+                button.interactable = false;
+            }
+        }
+    }
+
+    void RevealChannelClicked()
+    {
+        int cost = gameController.RevealChannel();
+        score.text = (int.Parse(score.text) - cost).ToString();
+
+        foreach (Button button in buttons)
+        {
+            if (button.name.Contains("channel"))
+            {
+                button.interactable = false;
+            }
+        }
+    }
+
+    void NarrowOptionsClicked()
+    {
+        (int cost, string[] namesToRemove) = gameController.NarrowOptions();
+        score.text = (int.Parse(score.text) - cost).ToString();
+
+        foreach (Button button in buttons)
+        {
+            if (namesToRemove.Contains(button.GetComponentInChildren<TMP_Text>().text.Substring(1)))
+            {
+                button.GetComponentInChildren<TMP_Text>().fontSize = 0;
+            }
+        }
+
+        foreach (Button button in buttons)
+        {
+            if (button.name.Contains("narrow"))
+            {
+                button.interactable = false;
+            }
+        }
+    }
+
     void RestartClicked()
     {
+        foreach (Button button in buttons)
+        {
+            button.interactable = true;
+            button.GetComponentInChildren<TMP_Text>().fontSize = 18;
+        }
+
         gameController.NewGame();
         score.text = "0";
         EventSystem.current.SetSelectedGameObject(null);
@@ -56,6 +133,33 @@ public class UIController : MonoBehaviour
 
     public void GameFinished()
     {
-        Debug.Log("game finished");
+        foreach (Button button in buttons)
+        {
+            if (!button.name.Contains("restart"))
+            {
+                button.interactable = false;
+                button.GetComponentInChildren<TMP_Text>().fontSize = 0;
+            }
+        }
+    }
+
+    public void DisableButtons(bool disableRestart = true)
+    {
+        foreach (Button button in buttons)
+        {
+            if (button.GetComponentInChildren<TMP_Text>().text.Contains("restart") && !disableRestart)
+            {
+                continue;
+            }
+            button.interactable = false;
+        }
+    }
+
+    public void EnableButtons()
+    {
+        foreach (Button button in buttons)
+        {
+            button.interactable = true;   
+        }
     }
 }

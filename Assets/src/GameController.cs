@@ -4,6 +4,8 @@ using System.Globalization;
 using System.IO;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Collections;
+using UnityEngine.UI;
 
 public class Message
 {
@@ -32,16 +34,52 @@ public class User
     }
 }
 
+public class Entry
+{
+    public User user;
+    public Message message;
+    public bool userRevealed = false;
+    public bool channelRevealed = false;
+    public bool datetimeRevealed = false;
+    public int score = 0;
+
+    public Entry(User user, Message message)
+    {
+        this.user = user;
+        this.message = message;
+    }
+
+    public void RevealAll()
+    {
+        userRevealed = true;
+        channelRevealed = true;
+        datetimeRevealed = true;
+    }
+
+}
+
 public class GameController : MonoBehaviour
 {
     public UIController uiController;
     public SpriteController spriteController;
     private List<User> users;
+    private Dictionary<string, User> usersByDisplayName;
     private int messageContentLimit = 40;
     private int maxEntries = 10;
     private int currentEntryIndex;
+    private Entry currentEntry;
+    private int timestampCost = 5;
+    private int channelCost = 5;
+    private int narrowCost = 30;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    /*
+    typing game:
+    assign 5 letters with their corresponding scrabble point value
+    each round has three word options and you type one of the three words
+    gain points from each assigned letter that was contained in the word
+    repeat rounds for 60 seconds
+    */
+
     void Start()
     {
         LoadUsers();
@@ -50,14 +88,27 @@ public class GameController : MonoBehaviour
     public void NewGame()
     {
         spriteController.Clear();
-        (User user, Message message) = RandomEntry();
-        spriteController.NewMessage(user, message);
+        (User user, Message message) = RandomUserMessage();
+        currentEntry = new Entry(user, message);
+        spriteController.NewEntry(currentEntry);
         currentEntryIndex = 0;
     }
 
-    public int NewGuess()
+    public int NewGuess(string displayName)
     {
-        spriteController.NewGuess(users[0]);
+        bool random = displayName == "Random";
+        if (random)
+        {
+            displayName = users[Random.Range(0, users.Count)].displayName;
+        }
+
+        // total score with reveal costs is passed to spriteController.NewGuess, but this function only returns 0 or 100
+
+        currentEntry.RevealAll();
+        spriteController.ReplaceEntry(currentEntry);
+        bool correctGuess = displayName == currentEntry.user.displayName;
+        int guessScore = currentEntry.score + (correctGuess ? 100 : 0);
+        spriteController.NewGuess(UserByDisplayName(displayName), guessScore, random);
 
         if (currentEntryIndex == maxEntries - 1)
         {
@@ -65,12 +116,51 @@ public class GameController : MonoBehaviour
         }
         else
         {
-            (User user, Message message) = RandomEntry();
-            spriteController.NewMessage(user, message);
-            currentEntryIndex += 1;
+            StartCoroutine(NewEntryDelayed(0.5f));
         }
 
-        return 100;
+        return correctGuess ? 100 : 0;
+    }
+
+    public int RevealTimestamp()
+    {
+        currentEntry.datetimeRevealed = true;
+        currentEntry.score -= timestampCost;
+        spriteController.ReplaceEntry(currentEntry);
+        return timestampCost;
+    }
+
+    public int RevealChannel()
+    {
+        currentEntry.channelRevealed = true;
+        currentEntry.score -= channelCost;
+        spriteController.ReplaceEntry(currentEntry);
+        return channelCost;
+    }
+
+    public (int, string[]) NarrowOptions()
+    {
+        string[] namesToRemove = new string[3];
+
+        List<User> usersCopy = new List<User>(users);
+        foreach (User user in users)
+        {
+            if (user == currentEntry.user)
+            {
+                usersCopy.Remove(user);
+            }
+        }
+
+        for (int removeCount = 0; removeCount < namesToRemove.Length; removeCount++)
+        {
+            int removeIndex = Random.Range(0, usersCopy.Count);
+            namesToRemove[removeCount] = usersCopy[removeIndex].displayName;
+            usersCopy.RemoveAt(removeIndex);
+        }
+
+        currentEntry.score -= narrowCost;
+
+        return (narrowCost, namesToRemove);
     }
 
     private void LoadUsers()
@@ -78,16 +168,28 @@ public class GameController : MonoBehaviour
         users = new List<User>
         {
             new User(
+            "metta241",
+            "Vi",
+            Resources.Load<Sprite>("vi_pfp"),
+            "#8A1549"
+        ),
+            new User(
+            "asterdrake",
+            "Ekko",
+            Resources.Load<Sprite>("ekko_pfp"),
+            "#3498DB"
+        ),
+            new User(
             "n1trosquid",
             "Viktor",
             Resources.Load<Sprite>("viktor_pfp"),
             "#C40A16"
         ),
             new User(
-            "metta241",
-            "Vi",
-            Resources.Load<Sprite>("vi_pfp"),
-            "#8A1549"
+            "connivingkitten",
+            "Zac",
+            Resources.Load<Sprite>("zac_pfp"),
+            "#2BB264"
         ),
             new User(
             "sunnnyfish",
@@ -102,18 +204,6 @@ public class GameController : MonoBehaviour
             "#5F0F11"
         ),
             new User(
-            "asterdrake",
-            "Ekko",
-            Resources.Load<Sprite>("ekko_pfp"),
-            "#3498DB"
-        ),
-            new User(
-            "connivingkitten",
-            "Zac",
-            Resources.Load<Sprite>("zac_pfp"),
-            "#2BB264"
-        ),
-            new User(
             "coleszn7",
             "Donger",
             Resources.Load<Sprite>("donger_pfp"),
@@ -122,7 +212,7 @@ public class GameController : MonoBehaviour
         };
 
         List<Message> fileMessages = new List<Message>();
-        using (var reader = new StreamReader("Assets/Resources/messages.csv"))
+        using (var reader = new StreamReader($"{Application.streamingAssetsPath}/messages.csv"))
         using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
         {
             IEnumerable<Message> fileMessagesEnumerator = csv.GetRecords<Message>();
@@ -144,6 +234,18 @@ public class GameController : MonoBehaviour
                 }
             }
         }
+    }
+
+    private User UserByDisplayName(string displayName)
+    {
+        foreach (User user in users)
+        {
+            if (user.displayName == displayName)
+            {
+                return user;
+            }
+        }
+        return null;
     }
 
     private string FormatContent(string content)
@@ -179,9 +281,31 @@ public class GameController : MonoBehaviour
             {"187326704916758528", "Vi"}
         };
 
-        Dictionary<string, string> roleToDisplayName = new Dictionary<string, string>
+        Dictionary<string, string> idToRole = new Dictionary<string, string>
         {
-            
+            {"&790758099522813974", "Vi"},
+            {"&790758737546706966", "Viktor"},
+            {"&790759604492566579", "Jinx"},
+            {"&790759609068683306", "Heimerdinger"},
+            {"&790760194959081492", "Ekko"},
+            {"&791923745509343232", "The Villain"},
+            {"&915475832934391908", "Silco"},
+            {"&915473945006837811", "Zaunites"},
+            {"&943334759348723733", "THE Aram Andy"},
+            {"&1119858900380954644", "Douma"},
+            {"&933559622499971102", "Aram Andies"},
+            {"&974534049374806026", "Lux"},
+            {"&951218519402496020", "Yuumi Abuser"},
+            {"&1187113272508420129", "NQN"},
+            {"&1190356852047888454", "Server Booster"},
+            {"&1199845181567017011", "Blitzcrank"},
+            {"&1226835425893548044", "Fake and Fraud"},
+            {"&1299212780775276556", "FlaviBot"},
+            {"&1316107204356608020", "Gnar"},
+            {"&1319893416489914392", "Dice Maiden"},
+            {"&1378954315904847954", "Thresh"},
+            {"&1405086865173909564", "The Council"},
+            {"&1434718367054303233", "test"}
         };
 
         if (content.Contains('\n'))
@@ -192,12 +316,13 @@ public class GameController : MonoBehaviour
         {
             content = content.Replace(kvp.Key, $"{kvp.Value}");
         }
-        foreach (KeyValuePair<string, string> kvp in roleToDisplayName)
+        foreach (KeyValuePair<string, string> kvp in idToRole)
         {
             content = content.Replace(kvp.Key, $"{kvp.Value}");
         }
+
         content = Regex.Replace(content, @"<[^:]*(:[^:]+:)\d+>", @"$1");
-        content = Regex.Replace(content, @"<@([^>]+)>", @"$1");
+        content = Regex.Replace(content, @"<@([^>]+)>", @"@$1");
         if (content.Length > messageContentLimit)
         {
             content = content.Substring(0, messageContentLimit) + " (...)";
@@ -215,17 +340,29 @@ public class GameController : MonoBehaviour
         string month = dateParts[1].TrimStart('0');
         string day = dateParts[2];
         string year = dateParts[0];
-        string hour = int.Parse(timeParts[0]) > 12 ? (int.Parse(timeParts[0]) - 12).ToString() : timeParts[0];
-        if (timeParts[0] == "0") { hour = "12"; }
+        string hour = (int.Parse(timeParts[0]) > 12 ? (int.Parse(timeParts[0]) - 12).ToString() : timeParts[0]).TrimStart('0');
+        if (int.Parse(timeParts[0]) == 0) { hour = "12"; }
         string minute = timeParts[1];
 
         return $"{month}/{day}/{year} {hour}:{minute} {(int.Parse(timeParts[0]) >= 12 ? "PM" : "AM")}";
     }
 
-    private (User, Message) RandomEntry()
+    private (User, Message) RandomUserMessage()
     {
-        User user = users[UnityEngine.Random.Range(0, users.Count)];
-        Message message = user.messages[UnityEngine.Random.Range(0, user.messages.Count)];
+        User user = users[Random.Range(0, users.Count)];
+        Message message = user.messages[Random.Range(0, user.messages.Count)];
         return (user, message);
+    }
+
+    private IEnumerator NewEntryDelayed(float seconds)
+    {
+        uiController.DisableButtons();
+        yield return new WaitForSeconds(seconds);
+        uiController.EnableButtons();
+
+        (User user, Message message) = RandomUserMessage();
+        currentEntry = new Entry(user, message);
+        spriteController.NewEntry(currentEntry);
+        currentEntryIndex += 1;
     }
 }
